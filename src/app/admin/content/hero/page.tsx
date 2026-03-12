@@ -130,7 +130,7 @@ export default function HeroContentPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Background Image</label>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm"
             />

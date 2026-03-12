@@ -185,6 +185,7 @@ export interface HeroContent {
   subtitle: string;
   description: string;
   imageUrl: string;
+  heroImage?: string;
   ctaPrimaryText: string;
   ctaSecondaryText: string;
 }
@@ -319,7 +320,7 @@ export async function deleteBoardMember(id: string): Promise<ApiResponse<{ delet
 export async function updateHeroContent(data: Partial<HeroContent> & { image?: File }): Promise<ApiResponse<HeroContent>> {
   if (data.image) {
     const formData = new FormData();
-    formData.append("image", data.image);
+    formData.append("heroImage", data.image);
     if (data.title != null) formData.append("title", data.title);
     if (data.subtitle != null) formData.append("subtitle", data.subtitle);
     if (data.description != null) formData.append("description", data.description);

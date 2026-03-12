@@ -16,6 +16,7 @@ export async function GET() {
       subtitle: hero.subtitle,
       description: hero.description,
       imageUrl: hero.imageUrl,
+      heroImage: hero.imageUrl,
       ctaPrimaryText: hero.ctaPrimaryText,
       ctaSecondaryText: hero.ctaSecondaryText,
     });

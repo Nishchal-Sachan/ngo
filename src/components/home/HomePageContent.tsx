@@ -297,7 +297,7 @@ export function HomePageContent() {
     heroContent.description ??
     "We are a registered non-profit dedicated to uplifting underprivileged communities through education, healthcare, environmental initiatives, and women empowerment. Our programs create sustainable change and lasting impact.";
   const heroImageUrl =
-    hero?.imageUrl ?? heroContent.heroImageUrl ?? heroContent.backgroundImageUrl;
+    hero?.imageUrl ?? hero?.heroImage ?? heroContent.heroImageUrl ?? heroContent.backgroundImageUrl ?? placeholderImage;
   const ctaPrimary = hero?.ctaPrimaryText ?? "Donate";
   const ctaSecondary = hero?.ctaSecondaryText ?? "Volunteer";
 
@@ -307,7 +307,7 @@ export function HomePageContent() {
       <section
         id="home"
         className="relative min-h-[70vh] flex flex-col justify-center py-24 px-4 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${heroImageUrl})` }}
+        style={{ backgroundImage: `url(${heroImageUrl || placeholderImage})` }}
       >
         <div className="absolute inset-0 bg-[#0F3D73]/75" />
         <div className="relative z-10 max-w-4xl mx-auto text-center text-white">

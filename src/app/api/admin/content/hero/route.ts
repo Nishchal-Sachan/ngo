@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import connectDB from "@/lib/db";
 import HeroSection from "@/models/HeroSection";
-import { saveFile } from "@/lib/upload";
+import { saveHeroImage, validateHeroImage } from "@/lib/upload";
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1200&q=80";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -22,29 +22,27 @@ export async function PUT(request: NextRequest) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
+      const heroImage = formData.get("heroImage") as File | null;
       const image = formData.get("image") as File | null;
+      const file = heroImage ?? image;
 
       let imageUrl: string | undefined;
 
-      if (image && image.size > 0) {
-        if (image.size > MAX_IMAGE_SIZE) {
-          return errorResponse("Image must be under 5MB", 400, "VALIDATION_ERROR");
-        }
-        if (!ALLOWED_IMAGE_TYPES.includes(image.type)) {
-          return errorResponse(
-            "Invalid image type. Use JPEG, PNG, WebP, or GIF",
-            400,
-            "VALIDATION_ERROR"
-          );
+      if (file && file.size > 0) {
+        try {
+          validateHeroImage(file);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Invalid image";
+          return errorResponse(msg, 400, "VALIDATION_ERROR");
         }
 
-        const bytes = await image.arrayBuffer();
+        const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        const { url } = await saveFile("hero", buffer, image.type, image.name);
+        const { url } = await saveHeroImage(buffer, file.type, file.name);
         imageUrl = url;
       }
 
-      const existingUrl = formData.get("imageUrl") as string | null;
+      const existingUrl = (formData.get("imageUrl") ?? formData.get("image")) as string | null;
       data = {
         title: (formData.get("title") as string) || undefined,
         subtitle: (formData.get("subtitle") as string) || undefined,
@@ -82,7 +80,7 @@ export async function PUT(request: NextRequest) {
       subtitle: "Empowering Communities Through Sustainable Development Since 2015.",
       description:
         "We are a registered non-profit dedicated to uplifting underprivileged communities through education, healthcare, environmental initiatives, and women empowerment.",
-      imageUrl: "https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1200&q=80",
+      imageUrl: PLACEHOLDER_IMAGE,
       ctaPrimaryText: "Donate",
       ctaSecondaryText: "Volunteer",
     };
@@ -104,6 +102,7 @@ export async function PUT(request: NextRequest) {
         subtitle: hero.subtitle,
         description: hero.description,
         imageUrl: hero.imageUrl,
+        heroImage: hero.imageUrl,
         ctaPrimaryText: hero.ctaPrimaryText,
         ctaSecondaryText: hero.ctaSecondaryText,
       },
