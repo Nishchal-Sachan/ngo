@@ -1,0 +1,25 @@
+html {
+  scroll-behavior: smooth;
+}
+
+section {
+  scroll-margin-top: 80px;
+}
+
+/* Institutional typography utilities */
+.font-heading {
+  font-family: var(--font-serif), Georgia, serif;
+}
+
+.text-body {
+  line-height: 1.7;
+}
+
+.prose-institutional p {
+  margin-bottom: 1rem;
+}
+
+.prose-institutional p:last-child {
+  margin-bottom: 0;
+}
+
