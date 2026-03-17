@@ -1,89 +1,72 @@
 /**
- * Local file storage in uploads folder.
- * Works both locally and in production with persistent disk.
+ * Cloudinary upload - works in production (Vercel) and locally.
+ * No local filesystem or multer disk storage.
  */
-import { writeFile, unlink } from "fs/promises";
-import { existsSync, mkdirSync } from "fs";
-import path from "path";
-import { randomUUID } from "crypto";
+import { getCloudinary } from "./cloudinary";
 
-const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
-
-export const UPLOAD_PATHS = {
-  campaigns: "campaigns",
-  reports: "reports",
-  hero: "hero",
-} as const;
-
+const CLOUDINARY_FOLDER = "ngo-uploads";
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
-function getExtension(mimeType: string, fallback = ""): string {
-  const map: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-    "application/pdf": ".pdf",
-  };
-  return map[mimeType] ?? fallback;
-}
+export type UploadFolder = "hero" | "campaigns" | "reports";
 
 /**
- * Ensures the uploads directory exists. Uses sync ops for reliability before async write.
+ * Upload a buffer to Cloudinary. Returns secure_url and public_id.
  */
-function ensureUploadsDir(): void {
-  if (!existsSync(UPLOADS_DIR)) {
-    mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-}
-
-/**
- * Save a file buffer to the uploads folder. Returns the public URL path.
- * Filename: Date.now()-randomUUID().ext to avoid collisions.
- */
-export async function saveFile(
-  subfolder: keyof typeof UPLOAD_PATHS,
+export async function uploadToCloudinary(
   buffer: Buffer,
-  mimeType: string,
-  originalName?: string
-): Promise<{ url: string; relativePath: string }> {
-  ensureUploadsDir();
-  const folder = UPLOAD_PATHS[subfolder];
-  const dir = path.join(UPLOADS_DIR, folder);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+  folder: UploadFolder,
+  options?: { mimeType?: string; resourceType?: "image" | "raw" | "auto" }
+): Promise<{ url: string; publicId: string }> {
+  const cloudFolder = `${CLOUDINARY_FOLDER}/${folder}`;
+  const resourceType = options?.resourceType ?? "auto";
+  const mimeType = options?.mimeType ?? "image/jpeg";
+
+  const dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`;
+  const cloudinary = getCloudinary();
+
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: cloudFolder,
+    resource_type: resourceType,
+  });
+
+  if (!result?.secure_url || !result?.public_id) {
+    throw new Error("Cloudinary upload failed: no URL returned");
   }
 
-  const ext = getExtension(mimeType, path.extname(originalName ?? "") || ".bin");
-  const filename = `${Date.now()}-${randomUUID()}${ext}`;
-  const fullPath = path.join(dir, filename);
-  await writeFile(fullPath, buffer);
-
-  const url = `/uploads/${folder}/${filename}`;
-  const relativePath = `${folder}/${filename}`;
-  return { url, relativePath };
+  return { url: result.secure_url, publicId: result.public_id };
 }
 
 /**
- * Save hero image directly to /public/uploads (no subfolder).
- * Returns path like /uploads/filename.jpg for Next.js static serving.
+ * Upload hero image to Cloudinary. Returns Cloudinary URL.
  */
 export async function saveHeroImage(
   buffer: Buffer,
   mimeType: string,
-  originalName?: string
+  _originalName?: string
 ): Promise<{ url: string; relativePath: string }> {
-  ensureUploadsDir();
+  const { url, publicId } = await uploadToCloudinary(buffer, "hero", {
+    resourceType: "image",
+    mimeType,
+  });
+  return { url, relativePath: publicId };
+}
 
-  const ext = getExtension(mimeType, path.extname(originalName ?? "") || ".jpg");
-  const filename = `${Date.now()}-${randomUUID()}${ext}`;
-  const fullPath = path.join(UPLOADS_DIR, filename);
-  await writeFile(fullPath, buffer);
-
-  const url = `/uploads/${filename}`;
-  const relativePath = filename;
-  return { url, relativePath };
+/**
+ * Save file (campaigns/reports) to Cloudinary.
+ */
+export async function saveFile(
+  subfolder: "campaigns" | "reports",
+  buffer: Buffer,
+  mimeType: string,
+  _originalName?: string
+): Promise<{ url: string; relativePath: string }> {
+  const resourceType = mimeType === "application/pdf" ? "raw" : "image";
+  const { url, publicId } = await uploadToCloudinary(buffer, subfolder, {
+    resourceType,
+    mimeType,
+  });
+  return { url, relativePath: publicId };
 }
 
 /**
@@ -99,13 +82,16 @@ export function validateHeroImage(file: File): void {
 }
 
 /**
- * Delete a file by its stored path (e.g. reports/xxx.pdf or filename.jpg).
+ * Delete a file from Cloudinary by public_id.
  */
-export async function deleteFile(relativePath: string): Promise<void> {
-  const fullPath = path.join(UPLOADS_DIR, relativePath);
+export async function deleteFile(publicId: string): Promise<void> {
   try {
-    await unlink(fullPath);
+    const cloudinary = getCloudinary();
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "auto" });
+    if (result.result !== "ok" && result.result !== "not found") {
+      console.warn("[Cloudinary] Delete result:", result);
+    }
   } catch (err) {
-    console.warn("[Upload] Delete failed:", fullPath, err);
+    console.warn("[Cloudinary] Delete failed:", publicId, err);
   }
 }
